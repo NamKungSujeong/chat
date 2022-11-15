@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="e">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>채팅 프로그램</title>
+
+    <!-- socket.io cdn -->
+    <script
+      src="https://cdn.socket.io/4.5.3/socket.io.min.js"
+      integrity="sha384-WPFUvHkB1aHA5TDSZi6xtDgkF0wXJcIIxXhC6h8OT8EH3fC5PWro5pWJ1THjcfEi"
+      crossorigin="anonymous"
+    ></script>
+    <link rel="stylesheet" href="/static/css/chat.css" />
+    <!-- CDN -->
+    <script
+      src="https://code.jquery.com/jquery-3.6.1.min.js"
+      integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ="
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <!-- 실습44-2 채팅창 입장 문구 -->
+    <h1>채팅 기능 만들기~~</h1>
+    <div class="entry-box">
+      <input type="text" id="nickname" placeholder="닉네임" autofocus />
+      <button type="button" id="entry" onclick="entry()">입장</button>
+      <div class="error"></div>
+    </div>
+    <div class="chat-box d-none">
+      <div id="chat-list">
+        <!-- 실습 44 임시데이터 -->
+        <!-- <div id="my-chat">
+          <div>안녕</div>
+          <img id="userImg" src="/static/img/user.png" alt="user" />
+        </div>
+        <div id="other-chat">
+          <img id="userImg" src="/static/img/user.png" alt="user" />
+          <div>응 안녕</div>
+        </div>
+        <div class="notice">xx가 입장했습니다.</div> -->
+      </div>
+      <input type="text" id="message" placeholder="내용 입력" autofocus />
+      <button type="submit" id="submit" onclick="send()">전송</button>
+    </div>
+
+    <script>
+      let socket = io.connect();
+      let myNick;
+      let text = document.querySelector(".error");
+
+      socket.on("connect", () => {
+        console.log("**** ⭕ Client Socket Connected >>", socket.id);
+      });
+
+      socket.on("notice", (msg) => {
+        console.log("socket on notice", msg);
+
+        document
+          .querySelector("#chat-list")
+          .insertAdjacentHTML(
+            "beforeend",
+            ` <div class="notice">${msg}</div> `
+          );
+        $("#chat-list").scrollTop($("#chat-list")[0].scrollHeight);
+      });
+
+      //실습 44-2 채팅창 입장 안내문 socket.id => nickname
+      function entry() {
+        // console.log(document.querySelector("#nickname").value);
+        if (document.querySelector("#nickname").value === "") {
+          return (
+            (text.textContent = "닉네임을 입력해주세요"),
+            (text.style.color = "red"),
+            (text.style.marginLeft = "120px")
+          );
+        }
+        socket.emit("setNick", document.querySelector("#nickname").value);
+        text.style.display = "none";
+      }
+
+      socket.on("entrySuccess", (nick) => {
+        myNick = nick;
+
+        // 입력창 비활성화
+        document.querySelector("#nickname").disabled = true;
+        // 버튼 비활성화
+        document.querySelector(".entry-box > button").disabled = true;
+        //채팅 박스 보여주기
+        document.querySelector(".chat-box").classList.remove("d-none");
+      });
+
+      socket.on("error", (error) => {
+        alert(error);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("**** ⭕ Client Socket disconnected >>", socket.id);
+      });
+
+      // 실습 45 채팅창 메세지 전송
+      // 'send' 이벤트 전송
+
+      function send() {
+        if (document.querySelector("#message").value === "") {
+          return;
+        }
+
+        const data = {
+          myNick: myNick,
+          msg: document.querySelector("#message").value,
+        };
+        socket.emit("send", data);
+
+        // let chatBox = document.querySelector("#chat-list");
+
+        // chatBox.scrollTo(location);
+        // console.log(location);
+      }
+
+      // 실습 45 채팅창 메세지 전송 step2ge
+      // "newMessage" 이벤트 전달받기
+      // data => {nick : , msg: }
+      socket.on("newMessage", (data) => {
+        console.log("socket on newmessage >> ", data);
+        // 생성해야할 채팅 html 구조
+        // <div id="my-chat">
+        //     <div>안녕</div>
+        //     <img id="userImg" src="/static/img/user.png" alt="user" />
+        //   </div>
+        //   <div id="other-chat">
+        //     <img id="userImg" src="/static/img/user.png" alt="user" />
+        //     <div>응 안녕</div>
+        //   </div>
+
+        let chatList = document.querySelector("#chat-list");
+        let userImg = document.createElement("img");
+        let div = document.createElement("div"); // #my-chat or #other-chat
+        let divName = document.createElement("div");
+        let divflex = document.createElement("div");
+        // <div></div>
+        let divChat = document.createElement("div"); // 가장 안쪽에 div(메세지 박스) 생성
+        // <div></div>
+
+        // 새 메세지(data => {nick : , msg: })가 도착했는데
+        // myNick에 저장된 현재 내 닉네임과 같다면
+        // 새 메세지(data)의 nick이 같다면, 내가 보낸 채팅
+        // 새 메세지(data)의 nick이 다르다면, 상대방이 보낸 채팅
+
+        if (myNick === data.nick) {
+          div.classList.add("my-chat-box");
+          divChat.classList.add("my-chat");
+          divName.classList.add("myName");
+          divflex.classList.add("flex");
+          userImg.setAttribute("src", "/static/img/user.png");
+        } else {
+          div.classList.add("other-chat-box");
+          divChat.classList.add("other-chat");
+          divName.classList.add("otherName");
+          divflex.classList.add("flex");
+          userImg.setAttribute("src", "/static/img/user.png");
+        }
+
+        divName.textContent = `${data.nick}`;
+        divChat.textContent = `${data.msg}`; // <div> nick:msg </div>
+        div.append(userImg);
+        div.append(divflex);
+        divflex.append(divName);
+        divflex.append(divChat);
+        chatList.append(div);
+        $("#chat-list").scrollTop($("#chat-list")[0].scrollHeight);
+      });
+
+      let input = document.querySelector("#nickname");
+      input.addEventListener("keypress", function (event) {
+        if (event.keyCode === 13) {
+          // event.preventDefault();
+          // document.querySelector("#entry").click();
+          entry();
+          input.value = "";
+        }
+      });
+
+      let inputChat = document.querySelector("#message");
+      inputChat.addEventListener("keypress", function (event) {
+        if (event.keyCode === 13) {
+          // event.preventDefault();
+          // document.querySelector("#submit").click();
+          send();
+          inputChat.value = "";
+        }
+      });
+    </script>
+  </body>
+</html>
