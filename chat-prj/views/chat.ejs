@@ -22,13 +22,19 @@
   </head>
   <body>
     <!-- 실습44-2 채팅창 입장 문구 -->
-    <h1>채팅 기능 만들기~~</h1>
     <div class="entry-box">
-      <input type="text" id="nickname" placeholder="닉네임" autofocus />
+      <input
+        type="text"
+        id="nickname"
+        placeholder="닉네임"
+        autofocus
+        required
+      />
       <button type="button" id="entry" onclick="entry()">입장</button>
       <div class="error"></div>
     </div>
     <div class="chat-box d-none">
+      <div class="userCount">접속자 수: <span class="count"></span></div>
       <div id="chat-list">
         <!-- 실습 44 임시데이터 -->
         <!-- <div id="my-chat">
@@ -41,6 +47,12 @@
         </div>
         <div class="notice">xx가 입장했습니다.</div> -->
       </div>
+      <select id="nick-list">
+        <!-- <option value="all"></option>
+        <option value="socketID1">nick1</option>
+        <option value="socketID2">nick2</option> -->
+      </select>
+      에게
       <input type="text" id="message" placeholder="내용 입력" autofocus />
       <button type="submit" id="submit" onclick="send()">전송</button>
     </div>
@@ -49,6 +61,8 @@
       let socket = io.connect();
       let myNick;
       let text = document.querySelector(".error");
+      let count = document.querySelector(".count");
+      count.innerText = 0;
 
       socket.on("connect", () => {
         console.log("**** ⭕ Client Socket Connected >>", socket.id);
@@ -78,6 +92,8 @@
         }
         socket.emit("setNick", document.querySelector("#nickname").value);
         text.style.display = "none";
+
+        count.innerText = `${Number(count.innerText) + 1}`;
       }
 
       socket.on("entrySuccess", (nick) => {
@@ -108,7 +124,8 @@
         }
 
         const data = {
-          myNick: myNick,
+          myNick: myNick, // 'entrySuccess' 이벤트에서 입장 성공시 설정하는 내 닉네임
+          dm: document.querySelector("#nick-list").value, // 현재 선택된
           msg: document.querySelector("#message").value,
         };
         socket.emit("send", data);
@@ -142,6 +159,7 @@
         // <div></div>
         let divChat = document.createElement("div"); // 가장 안쪽에 div(메세지 박스) 생성
         // <div></div>
+        let time = document.createElement("div"); // 메세지 전송 시간 div 생성
 
         // 새 메세지(data => {nick : , msg: })가 도착했는데
         // myNick에 저장된 현재 내 닉네임과 같다면
@@ -153,25 +171,63 @@
           divChat.classList.add("my-chat");
           divName.classList.add("myName");
           divflex.classList.add("flex");
+          time.classList.add("time");
           userImg.setAttribute("src", "/static/img/user.png");
         } else {
           div.classList.add("other-chat-box");
           divChat.classList.add("other-chat");
           divName.classList.add("otherName");
           divflex.classList.add("flex");
+          time.classList.add("time");
           userImg.setAttribute("src", "/static/img/user.png");
         }
 
-        divName.textContent = `${data.nick}`;
-        divChat.textContent = `${data.msg}`; // <div> nick:msg </div>
+        // 실습 [46]
+        console.log("send data check >> ", data);
+        // 전체 : {nick: 'sd', msg: 'a'}
+        // DM : {nick: 'sd', msg: 'sss', dm: '(속닥속닥)'}
+        if (data.dm) {
+          divChat.classList.add("secret-chat");
+          divChat.textContent = data.dm;
+        }
+
+        divName.textContent += `${data.nick}`;
+        divChat.textContent += `${data.msg}`; // <div> nick:msg </div>
         div.append(userImg);
         div.append(divflex);
+        div.append(time);
         divflex.append(divName);
         divflex.append(divChat);
         chatList.append(div);
         $("#chat-list").scrollTop($("#chat-list")[0].scrollHeight);
+
+        let now = new Date();
+        let hour = String(now.getHours()).padStart(2, "0");
+        let minutes = String(now.getMinutes()).padStart(2, "0");
+
+        time.textContent = `${hour}:${minutes}`;
       });
 
+      socket.on("updateNicks", (nickArray) => {
+        console.log("socket on updateList >> ", nickArray);
+
+        let options = `<option value="all">전체</option>`;
+
+        for (const socketId in nickArray) {
+          options += `<option value="${socketId}">${nickArray[socketId]}</option>`;
+        }
+
+        // console.log(options);
+        document.querySelector("#nick-list").innerHTML = options;
+
+        // 유저 목록 하나하나를 option 태그로 만들어서 select에 추가
+        // select 태그 내부에 추가되어야 할 코드 형식
+        // <option value='all'>전체</option>
+        // <option value='socketID1'>nick1</option>
+        // <option value='socketID2'>nick2</option>
+      });
+
+      // enter 전송
       let input = document.querySelector("#nickname");
       input.addEventListener("keypress", function (event) {
         if (event.keyCode === 13) {

@@ -1,4 +1,3 @@
-const { openDelimiter } = require("ejs");
 const express = require("express");
 const app = express();
 // socket은 express가 아닌 http 모듈에 연결해야 사용 가능
@@ -15,6 +14,12 @@ app.get("/", (req, res) => {
 });
 
 const nickArray = {}; // 유저 목록
+
+// [실습 46]
+// 유저 목록 업데이트
+function updateList() {
+  io.emit("updateNicks", nickArray); // { socket.id : nick1, socket.id : nick2 ...}
+}
 
 // io.on()
 // : socket과 관련된 통신작업을 처리
@@ -64,6 +69,7 @@ io.on("connection", (socket) => {
       console.log("접속 유저 목록 >> ", nickArray);
       io.emit("notice", `${nick}님이 입장하셨습니다.`);
       socket.emit("entrySuccess", nick);
+      updateList();
     }
   });
 
@@ -78,12 +84,24 @@ io.on("connection", (socket) => {
     // 3. nickArray에서 해당 유저 삭제 (객체에서 key-value 쌍 삭제)
     delete nickArray[socket.id];
     // console.log(nickArray);
+
+    updateList(); // 유저 목록 업데이트
   });
 
+  // [실습 45] 채팅창 메세지 전송 step1
   socket.on("send", (data) => {
-    console.log("socket on send >> ", data);
-    const sendData = { nick: data.myNick, msg: data.msg };
-    io.emit("newMessage", sendData);
+    console.log("socket on send >> ", data); // {myNick: 'a', dm : 'all or 특정닉네임', msg: 'ss'}
+    if (data.dm !== "all") {
+      // [실습 46] DM 기능
+      let dmSocketId = data.dm; // data.dm: 특정 유저의 socket id
+      const sendData = { nick: data.myNick, msg: data.msg, dm: "(속닥속닥)" };
+      io.to(dmSocketId).emit("newMessage", sendData); // 특정 소켓 아이디에게만 메세지 전송;
+      socket.emit("newMessage", sendData); // 자기 자신에게도 DM 메세지 전송
+    } else {
+      // [실습 45] 채팅창 메세지 전송 step2
+      const sendData = { nick: data.myNick, msg: data.msg };
+      io.emit("newMessage", sendData);
+    }
   });
 });
 
